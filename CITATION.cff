@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this work, please cite it."
+title: "Cookie Clicker Stock-Market Autotrader"
+authors:
+  - family-names: Gong
+    given-names: Linbo
+date-released: 2025-09-24
+version: "0.1.0"
+type: software
+repository-code: https://github.com/yourname/cookieclicker-autotrader
