@@ -1,0 +1,217 @@
+version: 1.0
+updated: 2025-09-25
+scope: cookie-clicker-stock-market (bank-minigame)
+
+unlock-and-currency:
+  unlocked-by: "banks at level 1"
+  currency-symbol: "$"
+  currency-definition: "$ = seconds of maximum raw (unbuffed) cps"
+  persistence: "profits/positions reset on ascension"
+  raw-cps-affects:
+    increases-do-not-affect: ["golden/wrath cookie effects", "shimmering veil", "golden switch", "loans", "sugar frenzy"]
+    increases-that-do-affect: ["krumblor auras", "garden plants", "pantheon gods"]
+
+goods:
+  count: 17
+  tied-to-buildings: true
+  includes-you-stock: true
+  activation-rule: "good becomes active when building.highest > 0"
+  ui-defaults:
+    hidden-on-reset: true
+    icon-format: "[building.iconColumn, 33]"
+
+clock:
+  tick-interval-seconds: 60
+  stored-values: 65
+  graph:
+    hover-tooltip: "shows value and lookback age per point"
+    toggles: ["line-style", "color-mode"]
+
+state-variables:
+  value: "me.val"
+  drift: "me.d"
+  mode: "me.mode ∈ {0..5}"
+  duration: "me.dur (ticks remaining in current mode)"
+  history-buffer: "me.vals (unshift current value; cap 65)"
+  last-action-flag: "me.last ∈ {0:none,1:bought,2:sold}"
+  last-buy-price: "me.prev"
+
+modes:
+  id-to-label:
+    0: "stable"
+    1: "slow-rise"
+    2: "slow-fall"
+    3: "fast-rise"
+    4: "fast-fall"
+    5: "chaotic"
+  selection:
+    on-reset: "[0,1,1,2,2,3,4,5] weighted draw"
+    on-expiry: "reseed; chaos favored under certain conditions"
+  duration-draw: "dur = floor(10 + rand * (690 - 200 * dragon-boost))"
+
+resting-value-and-reversion:
+  resting-value-formula: "rest = 10 + 10*id + (bank.level - 1)"
+  reversion-step: "val += (rest - val) * 0.01"
+  notes: "rest increases with good id and bank level"
+
+random-and-global-shocks:
+  base-drift-decay: "d *= 0.97 + 0.01 * dragon-boost"
+  mode-perturbations:
+    stable: "d*=0.95; d += 0.05 * U(-0.5,0.5)"
+    slow-rise: "d*=0.99; d += 0.05 * (U(0,1) - 0.1)"
+    slow-fall: "d*=0.99; d -= 0.05 * (U(0,1) - 0.1)"
+    fast-rise: "d += 0.15 * (U(0,1) - 0.1); val += U(0,5)"
+    fast-fall: "d -= 0.15 * (U(0,1) - 0.1); val -= U(0,5)"
+    chaotic: "d += 0.3 * U(-0.5,0.5)"
+  additional-noise:
+    heavy-tail-kick: "val += ((2*rand-1)^11) * 3"
+    small-jitters: "if rand < 0.15 → val += U(-1.5,1.5) * 2"
+    occasional-spike: "if rand < 0.03 → val += U(-1,1) * (10 + 10 * dragon-boost)"
+    drift-jitter: "if rand < 0.1 → d += U(-0.5,0.5) * (0.3 + 0.2 * dragon-boost)"
+  chaos-hooks:
+    chaotic-mode:
+      large-kicks: "if rand < 0.5 → val += U(-5,5) * 2"
+      drift-reset: "if rand < 0.2 → d = U(-0.5,0.5) * (2 + 6 * dragon-boost)"
+    fast-rise:
+      tweaks: "if rand < 0.3 → small drift tweak; val += (U(0,1) - 0.7) * 10"
+      switch: "if rand < 0.03 → mode = fast-fall"
+    fast-fall:
+      tweaks: "if rand < 0.3 → small drift tweak; val += (U(0,1) - 0.3) * 10"
+  global-shock:
+    trigger: "if rand < 0.1 + 0.1 * dragon-boost → globD = U(-1,1); globP = rand"
+    per-good-effect: "with prob globP apply coupled shock to val and d; set dur = 0"
+  caps-and-floors:
+    hard-floor-value: 1
+    soft-floor-below-5:
+      - "if val < 5 → val += (5 - val) * 0.5"
+      - "if val < 5 and d < 0 → d *= 0.95"
+    high-value-damp:
+      cap-formula: "cap = 100 + 3 * (bank.level - 1)"
+      effect: "if val > cap and d > 0 → d *= 0.9"
+  drift-application: "val += d"
+
+supreme-intellect-modifiers:
+  aura-name: "supreme-intellect"
+  effect-summary: "increases chaos probabilities/magnitudes; shortens durations; raises shock chance"
+
+warehouses:
+  capacity-per-good:
+    formula: "ceil(building.highest * (office-level > 4 ? 1.5 : 1) + bonus + 10 * building.level)"
+    bonus-by-office-level:
+      0: 0
+      1: 25
+      2: 50
+      3: 75
+      4: 100
+      5: "+50% base via 1.5 multiplier"
+  note: "capacity affects max inventory and therefore buy sizing"
+
+office-upgrades:
+  levels:
+    - level: 1
+      name: "credit-garage"
+      effect: "+25 capacity"
+      cost: "100 cursors (level 2+)"
+    - level: 2
+      name: "tiny-bank"
+      effect: "+1 loan slot, +50 capacity"
+      cost: "200 cursors (level 4+)"
+    - level: 3
+      name: "loaning-company"
+      effect: "+75 capacity"
+      cost: "350 cursors (level 8+)"
+    - level: 4
+      name: "finance-headquarters"
+      effect: "+1 loan slot, +100 capacity"
+      cost: "500 cursors (level 10+)"
+    - level: 5
+      name: "international-exchange"
+      effect: "+1 loan slot, +50% base capacity"
+      cost: "700 cursors (level 12+)"
+    - level: 6
+      name: "palace-of-greed"
+      effect: "fully-upgraded office (flavor)"
+      cost: "n/a"
+
+brokers:
+  count-variable: "m.brokers"
+  max-brokers: "ceil(grandma.highest / 10 + grandma.level)"
+  hire-cost-cookies: "raw-cps * 60 * 20"
+  buy-overhead:
+    base-percent: 20
+    reduction-multiplier-per-broker: 0.95
+    effective-multiplier: "1 + 0.01 * (20 * 0.95^brokers)"
+    applies-to: "buys-only"
+
+trading:
+  price-unit: "$econds"
+  buy-cookies-spent: "raw-cps * price-$ * overhead * n"
+  sell-cookies-gained: "raw-cps * price-$ * n"
+  overhead-on-buy: "as per brokers.effective-multiplier"
+  capacity-constraint: "buy size limited by max-stock - current-stock"
+  cash-constraint: "buy size limited by current cookies / unit buy cost"
+  sell-constraint: "sell size limited by current-stock"
+  same-tick-block: "cannot buy and sell the same stock within one tick"
+  last-buy-price-display: true
+  quick-buttons:
+    buy-1-10-100-max: true
+    sell-1-10-100-all: true
+  profit-tracking:
+    variable: "m.profit (in $econds)"
+    on-buy: "profit -= price-$ * overhead * n"
+    on-sell: "profit += price-$ * n"
+  achievements:
+    list:
+      - "buy-buy-buy"
+      - "make-my-day"
+      - "initial-public-offering"
+      - "liquid-assets"
+      - "gaseous-assets"
+      - "rookie-numbers"
+      - "no-nobility-in-poverty"
+      - "full-warehouses"
+      - "pyramid-scheme"
+
+loans:
+  loan-1:
+    name: "a-modest-loan"
+    upfront-downpayment: "20% of bank"
+    buff: { cps-multiplier: 1.5, duration: "2 hours" }
+    repay: { cps-multiplier: 0.25, duration: "4 hours" }
+  loan-2:
+    name: "a-pawnshop-loan"
+    upfront-downpayment: "40% of bank"
+    buff: { cps-multiplier: 2.0, duration: "40 minutes" }
+    repay: { cps-multiplier: 0.1, duration: "40 minutes" }
+  loan-3:
+    name: "a-retirement-loan"
+    upfront-downpayment: "50% of bank"
+    buff: { cps-multiplier: 1.2, duration: "2 days" }
+    repay: { cps-multiplier: 0.8, duration: "5 days" }
+  constraints:
+    slot-gating-by-office-level: true
+    reuse-block-while-active: true
+
+ui:
+  hide-toggle:
+    per-good: true
+    shift-click-solo: true
+  indicators:
+    delta-percent: "computed from vals[0]/vals[1]-1 (formatted to 2 decimals)"
+    color-codes: { up: "green ▲", down: "red ▼" }
+    next-tick-timer: true
+  graph-scaling: "auto-scale to fit visible goods"
+  sounds:
+    on-buy: "snd/cashOut.mp3"
+    on-sell: "snd/cashIn.mp3"
+
+unused-features:
+  opportunities:
+    present-in-code: true
+    tooltip-described: true
+    button-commented-out: true
+  sugar-lump-refill:
+    present-in-code: true
+    tooltip-described: true
+    gating-present: true
+    not-available-in-ui: true
